@@ -1,5 +1,4 @@
 <?php
-
 // phpcs:ignoreFile
 // @codeCoverageIgnoreStart
 
@@ -226,15 +225,15 @@ if (!defined('C3_CODECOVERAGE_MEDIATE_STORAGE')) {
         return __c3_exit();
     }
 
-    /**
-    * Keep track of the number of running tests
-    * @param bool $decrease default false. Whether to increase or decrease the counter
-    */
+     /**
+     * Keep track of the number of running tests
+     * @param bool $decrease default false. Whether to increase or decrease the counter
+     */
     function __c3_testcounter($decrease = false)
     {
         $blockfilename = realpath(C3_CODECOVERAGE_MEDIATE_STORAGE) . DIRECTORY_SEPARATOR . 'block_report';
         $file = fopen($blockfilename, 'c+');
-        if (flock($file, LOCK_EX)) {
+        if (flock($file, LOCK_EX)){
             // 24 bytes is enough to hold largest integer supported in 64 bit systems
             $testcounter = intval(fread($file, 24)) + ($decrease ? -1 : 1);
             ftruncate($file, 0);
@@ -266,7 +265,7 @@ if (!defined('C3_CODECOVERAGE_MEDIATE_STORAGE')) {
                 // wait until serialized coverage data of all tests is written to file
                 $blockfilename = realpath(C3_CODECOVERAGE_MEDIATE_STORAGE) . DIRECTORY_SEPARATOR . 'block_report';
                 if (file_exists($blockfilename) && filesize($blockfilename) !== 0) {
-                    while (file_get_contents($blockfilename) !== '0') {
+                    while(file_get_contents($blockfilename) !== '0') {
                         usleep(250000); // 0.25 sec
                     }
                 }

@@ -1,36 +1,89 @@
 services:
-
-  frontend:
-    build: frontend
-    ports:
-      - 20080:80
-    volumes:
-      # Re-use local composer cache via host-volume
-      - ~/.composer-docker/cache:/root/.composer/cache:delegated
-      # Mount source-code for development
-      - ./:/app
-
-  backend:
-    build: backend
-    ports:
-      - 21080:80
-    volumes:
-      # Re-use local composer cache via host-volume
-      - ~/.composer-docker/cache:/root/.composer/cache:delegated
-      # Mount source-code for development
-      - ./:/app
-
-  mysql:
-    image: mysql:8.0
+  db:
+    image: mysql:9.7
+    restart: always
     environment:
-      - MYSQL_ROOT_PASSWORD=verysecret
-      - MYSQL_DATABASE=yii2advanced
-      - MYSQL_USER=yii2advanced
-      - MYSQL_PASSWORD=secret
+      MYSQL_RANDOM_ROOT_PASSWORD: true
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: test
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost || exit 1"]
+      interval: 2s
+      timeout: 1s
+      retries: 5
 
-  #pgsql:
-  #  image: postgres:16
-  #  environment:
-  #    - POSTGRES_DB=yii2advanced
-  #    - POSTGRES_USER=yii2advanced
-  #    - POSTGRES_PASSWORD=secret
+  nginx:
+    image: nginx:1.31
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./:/app:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - app-net
+    depends_on:
+      - php
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 0s
+      retries: 3
+
+  php:
+    build:
+      context: ./docker/php
+    restart: always
+    working_dir: /app
+    volumes:
+      - .:/app
+    networks:
+      - app-net
+    depends_on:
+      db:
+        condition: service_healthy
+  
+  queue-worker:
+    build:
+      context: ./docker/php
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./:/app
+    command: php /app/yii queue/listen
+    networks:
+      - app-net
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  rabbitmq:
+    image: rabbitmq:latest
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbit_data:/var/lib/rabbitmq
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  rabbit_data:
+  db_data:
+
